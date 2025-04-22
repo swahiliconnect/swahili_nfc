@@ -1,0 +1,6 @@
+framework module SwahiliNFCPlugin {
+  umbrella header "SwahiliNFCPlugin.h"
+
+  export *
+  module * { export * }
+}
