@@ -1,6 +1,7 @@
 name: swahili_nfc
 description: A comprehensive Flutter package for NFC business card applications with a focus on secure contact exchange.
-version: 0.1.0
+version: 0.1.2
+publish_to: https://swahiliconnect.com/api/packages/pub
 homepage: https://github.com/swahiliconnect/swahili_nfc
 repository: https://github.com/swahiliconnect/swahili_nfc
 issue_tracker: https://github.com/swahiliconnect/swahili_nfc/issues
