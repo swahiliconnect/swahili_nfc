@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.4 - Android Gradle Fix (2024-04-26)
+
+### Added
+- Android Gradle configuration files
+  - Added build.gradle for proper plugin configuration
+  - Added settings.gradle to define project name
+  - Added gradle.properties with Android X support
+
+### Fixed
+- Fixed "Could not get unknown property 'android'" error when integrating with apps
+- Improved cross-platform compatibility
+- Addressed formatting issues in Dart files
+
+### Improved
+- Added more comprehensive API documentation
+- Updated example app with better error handling
+
 ## 0.1.3 - Example & Documentation Update (2024-04-25)
 
 ### Added

@@ -28,7 +28,7 @@ Add SwahiliNFC to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  swahili_nfc: ^0.1.3
+  swahili_nfc: ^0.1.4
 ```
 
 ## Platform Setup
