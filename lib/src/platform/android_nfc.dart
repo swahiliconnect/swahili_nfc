@@ -7,11 +7,12 @@ import '../utils/error_handler.dart';
 
 /// Android-specific NFC implementation
 class AndroidNFC implements PlatformNFC {
-  static const MethodChannel _channel = MethodChannel('com.swahilicard.nfc/android');
-  
+  static const MethodChannel _channel =
+      MethodChannel('com.swahilicard.nfc/android');
+
   bool _isSessionActive = false;
   StreamSubscription? _tagSubscription;
-  
+
   @override
   Future<bool> isAvailable() async {
     try {
@@ -20,7 +21,7 @@ class AndroidNFC implements PlatformNFC {
       return false;
     }
   }
-  
+
   @override
   Future<dynamic> startSession({
     required bool isReading,
@@ -29,13 +30,13 @@ class AndroidNFC implements PlatformNFC {
     if (_isSessionActive) {
       await stopSession();
     }
-    
+
     try {
       final result = await _channel.invokeMethod('startSession', {
         'isReading': isReading,
         'isWriting': isWriting,
       });
-      
+
       _isSessionActive = true;
       return result;
     } catch (e) {
@@ -45,13 +46,13 @@ class AndroidNFC implements PlatformNFC {
       );
     }
   }
-  
+
   @override
   Future<void> stopSession() async {
     if (!_isSessionActive) {
       return;
     }
-    
+
     try {
       await _channel.invokeMethod('stopSession');
       _isSessionActive = false;
@@ -64,7 +65,7 @@ class AndroidNFC implements PlatformNFC {
       );
     }
   }
-  
+
   @override
   Future<dynamic> readTag() async {
     if (!_isSessionActive) {
@@ -73,7 +74,7 @@ class AndroidNFC implements PlatformNFC {
         message: 'No active session for reading',
       );
     }
-    
+
     try {
       return await _channel.invokeMethod('readTag');
     } catch (e) {
@@ -83,7 +84,7 @@ class AndroidNFC implements PlatformNFC {
       );
     }
   }
-  
+
   @override
   Future<void> writeTag(dynamic data) async {
     if (!_isSessionActive) {
@@ -92,7 +93,7 @@ class AndroidNFC implements PlatformNFC {
         message: 'No active session for writing',
       );
     }
-    
+
     try {
       await _channel.invokeMethod('writeTag', {
         'data': data,
@@ -104,7 +105,7 @@ class AndroidNFC implements PlatformNFC {
       );
     }
   }
-  
+
   @override
   void startContinuousReading({
     required Function(dynamic) onTagDetected,
@@ -112,11 +113,12 @@ class AndroidNFC implements PlatformNFC {
     if (!_isSessionActive) {
       await startSession(isReading: true, isWriting: false);
     }
-    
+
     try {
       // Set up event channel for tag detection
-      const EventChannel tagChannel = EventChannel('com.swahilicard.nfc/android/tags');
-      
+      const EventChannel tagChannel =
+          EventChannel('com.swahilicard.nfc/android/tags');
+
       _tagSubscription = tagChannel.receiveBroadcastStream().listen(
         (dynamic tagData) {
           onTagDetected(tagData);
@@ -133,7 +135,7 @@ class AndroidNFC implements PlatformNFC {
       );
     }
   }
-  
+
   // Logger method instead of print
   void _logError(String message) {
     // In a production app, this would use a proper logging framework

@@ -4,13 +4,13 @@ import 'dart:typed_data';
 enum SecurityLevel {
   /// Standard NDEF records, readable by any NFC reader
   open,
-  
+
   /// Password-protected with simple PIN/password
   basic,
-  
+
   /// Encrypted data with app-specific decryption
   enhanced,
-  
+
   /// Digital signatures and authentication tokens
   premium,
 }
@@ -19,13 +19,13 @@ enum SecurityLevel {
 enum NFCDeviceType {
   /// Standard NFC card
   card,
-  
+
   /// NFC tag
   tag,
-  
+
   /// NFC wristband
   wristband,
-  
+
   /// Other NFC device
   other,
 }
@@ -34,13 +34,13 @@ enum NFCDeviceType {
 enum CardType {
   /// Personal business card
   personal,
-  
+
   /// Company business card
   company,
-  
+
   /// Temporary business card
   temporary,
-  
+
   /// Event-specific business card
   event,
 }
@@ -53,21 +53,21 @@ class BusinessCardData {
   final String? position;
   final String? email;
   final String? phone;
-  
+
   // Extended data
   final Map<String, String> social;
   final Map<String, String> custom;
   final Uint8List? profileImage;
-  
+
   // Metadata
   final String cardId;
   final DateTime createdAt;
   final CardType cardType;
-  
+
   // Security
   final SecurityLevel securityLevel;
   final bool isTemporary;
-  
+
   /// Creates a new business card data instance
   BusinessCardData({
     required this.name,
@@ -83,10 +83,9 @@ class BusinessCardData {
     this.cardType = CardType.personal,
     this.securityLevel = SecurityLevel.open,
     this.isTemporary = false,
-  }) : 
-    cardId = cardId ?? _generateCardId(),
-    createdAt = createdAt ?? DateTime.now();
-  
+  })  : cardId = cardId ?? _generateCardId(),
+        createdAt = createdAt ?? DateTime.now();
+
   /// Creates a BusinessCardData from JSON
   factory BusinessCardData.fromJson(Map<String, dynamic> json) {
     return BusinessCardData(
@@ -97,9 +96,9 @@ class BusinessCardData {
       phone: json['phone'],
       social: Map<String, String>.from(json['social'] ?? {}),
       custom: Map<String, String>.from(json['custom'] ?? {}),
-      profileImage: json['profileImage'] != null 
-        ? Uint8List.fromList(List<int>.from(json['profileImage']))
-        : null,
+      profileImage: json['profileImage'] != null
+          ? Uint8List.fromList(List<int>.from(json['profileImage']))
+          : null,
       cardId: json['cardId'],
       createdAt: DateTime.parse(json['createdAt']),
       cardType: CardType.values.firstWhere(
@@ -113,7 +112,7 @@ class BusinessCardData {
       isTemporary: json['isTemporary'] ?? false,
     );
   }
-  
+
   /// Converts BusinessCardData to JSON
   Map<String, dynamic> toJson() {
     return {
@@ -132,7 +131,7 @@ class BusinessCardData {
       'isTemporary': isTemporary,
     };
   }
-  
+
   /// Generates a unique card ID
   static String _generateCardId() {
     return DateTime.now().millisecondsSinceEpoch.toString();
@@ -144,7 +143,7 @@ class SecurityCredentials {
   final String? password;
   final String? encryptionKey;
   final DateTime? expiration;
-  
+
   SecurityCredentials({
     this.password,
     this.encryptionKey,
@@ -157,7 +156,7 @@ class SecurityOptions {
   final SecurityLevel level;
   final String? password;
   final DateTime? expiry;
-  
+
   SecurityOptions({
     required this.level,
     this.password,
@@ -170,7 +169,7 @@ class AnalyticsConfig {
   final bool collectLocationData;
   final bool collectDeviceInfo;
   final bool collectTimestamps;
-  
+
   AnalyticsConfig({
     this.collectLocationData = false,
     this.collectDeviceInfo = true,

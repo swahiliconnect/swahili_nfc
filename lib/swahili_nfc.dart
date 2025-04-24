@@ -42,7 +42,8 @@ class SwahiliNFC {
   static final _reader = NFCReader();
   static final _writer = NFCWriter();
   static final _sessionManager = SessionManager();
-  static final _encryption = Encryption(); // Now used in generateRandomKey method
+  static final _encryption =
+      Encryption(); // Now used in generateRandomKey method
   static final _authentication = Authentication();
   static final _analytics = Analytics();
 

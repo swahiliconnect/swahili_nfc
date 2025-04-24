@@ -2,11 +2,16 @@
 
 A comprehensive Flutter package for NFC business card applications with a focus on secure contact exchange.
 
+[![pub package](https://img.shields.io/pub/v/swahili_nfc.svg)](https://pub.dev/packages/swahili_nfc)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Overview
 
 SwahiliNFC simplifies NFC operations for business card applications, abstracting the complexities of NFC communication while providing robust security features and an intuitive API.
 
 Originally developed for SwahiliCard, this package helps developers quickly implement NFC functionality without the need to understand the underlying NFC protocols and security implementations.
+
+<img src="https://raw.githubusercontent.com/swahiliconnect/swahili_nfc/main/doc/images/swahilinfc_demo.gif" alt="SwahiliNFC Demo" width="300"/>
 
 ## Key Features
 
@@ -23,7 +28,7 @@ Add SwahiliNFC to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  swahili_nfc: ^0.1.0
+  swahili_nfc: ^0.1.3
 ```
 
 ## Platform Setup
@@ -53,24 +58,28 @@ Add the following to your `Info.plist`:
 
 You'll also need to enable the NFC capabilities in your app's entitlements.
 
-## Usage
+## Basic Usage
 
-### Basic Reading
+### Reading an NFC Card
 
 ```dart
-// Simple read operation
-final cardData = await SwahiliNFC.readTag();
+// Check if NFC is available
+final isAvailable = await SwahiliNFC.isAvailable();
+if (!isAvailable) {
+  print('NFC is not available on this device');
+  return;
+}
 
-// Continuous background reading
-SwahiliNFC.startBackgroundScan(
-  onTagDetected: (CardData data) {
-    // Process the data
-  },
-  scanDuration: Duration(minutes: 5),
-);
+// Read a card
+try {
+  final cardData = await SwahiliNFC.readTag();
+  print('Card read successfully: ${cardData.name}');
+} catch (e) {
+  print('Error reading card: $e');
+}
 ```
 
-### Basic Writing
+### Writing an NFC Card
 
 ```dart
 // Write operation with verification
@@ -93,7 +102,44 @@ final success = await SwahiliNFC.writeTag(
 );
 ```
 
-### Security
+### Background Scanning
+
+```dart
+// Continuous background reading
+SwahiliNFC.startBackgroundScan(
+  onTagDetected: (CardData data) {
+    // Process the data
+    print('Card detected: ${data.name}');
+  },
+  scanDuration: Duration(minutes: 5),
+);
+```
+
+## Advanced Features
+
+### Security Levels
+
+SwahiliNFC offers four security levels for your NFC cards:
+
+1. **Open** (`SecurityLevel.open`):
+   - Standard NDEF records, readable by any NFC reader
+   - No authentication required
+   - Great for public information sharing
+
+2. **Basic** (`SecurityLevel.basic`):
+   - Password-protected with simple PIN/password
+   - Lightweight security for semi-private information
+
+3. **Enhanced** (`SecurityLevel.enhanced`):
+   - Encrypted data with app-specific decryption
+   - Strong protection for sensitive information
+
+4. **Premium** (`SecurityLevel.premium`):
+   - Digital signatures and authentication tokens
+   - Tamper detection to prevent modification
+   - Highest level of security for critical data
+
+### Applying Security
 
 ```dart
 // Applying security to a card
@@ -101,11 +147,15 @@ await SwahiliNFC.setCardSecurity(
   securityLevel: SecurityLevel.enhanced,
   credentials: SecurityCredentials(
     password: "1234",
-    encryptionKey: generateRandomKey(),
+    encryptionKey: SwahiliNFC.generateRandomKey(),
     expiration: DateTime.now().add(Duration(days: 365)),
   ),
 );
+```
 
+### Reading Protected Cards
+
+```dart
 // Reading a protected card
 final cardData = await SwahiliNFC.readProtectedTag(
   credentials: SecurityCredentials(
@@ -113,6 +163,7 @@ final cardData = await SwahiliNFC.readProtectedTag(
   ),
   onAuthenticationError: (error) {
     // Handle authentication failure
+    print('Authentication error: $error');
   },
 );
 ```
@@ -238,6 +289,188 @@ Future<void> activateNewCard() async {
   );
 }
 ```
+
+## Advanced Use Cases
+
+### Working with Multiple Security Levels
+
+If your application needs to support different security levels based on user needs:
+
+```dart
+enum CardUserType { public, staff, admin }
+
+SecurityLevel getSecurityLevelForUser(CardUserType userType) {
+  switch (userType) {
+    case CardUserType.public:
+      return SecurityLevel.open;
+    case CardUserType.staff:
+      return SecurityLevel.basic;
+    case CardUserType.admin:
+      return SecurityLevel.premium;
+    default:
+      return SecurityLevel.open;
+  }
+}
+
+void createCardForUser(String name, CardUserType userType) async {
+  // Create card data
+  final cardData = BusinessCardData(
+    name: name,
+    // Other fields...
+  );
+  
+  // Get appropriate security level
+  final securityLevel = getSecurityLevelForUser(userType);
+  
+  // Configure security based on level
+  SecurityCredentials credentials;
+  switch (securityLevel) {
+    case SecurityLevel.open:
+      credentials = SecurityCredentials();
+      break;
+    case SecurityLevel.basic:
+      credentials = SecurityCredentials(
+        password: generateSimplePassword(),
+      );
+      break;
+    case SecurityLevel.enhanced:
+    case SecurityLevel.premium:
+      final encryptionKey = SwahiliNFC.generateRandomKey();
+      credentials = SecurityCredentials(
+        password: generateSimplePassword(),
+        encryptionKey: encryptionKey,
+        expiration: DateTime.now().add(Duration(days: 365)),
+      );
+      // Store encryption key securely for later use
+      await storeEncryptionKey(encryptionKey);
+      break;
+  }
+  
+  // Set security
+  await SwahiliNFC.setCardSecurity(
+    securityLevel: securityLevel,
+    credentials: credentials,
+  );
+  
+  // Write card
+  await SwahiliNFC.writeTag(data: cardData);
+}
+```
+
+### Event Registration System
+
+For creating an NFC-based event registration system:
+
+```dart
+class EventAttendee {
+  final String name;
+  final String email;
+  final String ticketId;
+  final bool isVIP;
+  
+  EventAttendee({
+    required this.name,
+    required this.email,
+    required this.ticketId,
+    this.isVIP = false,
+  });
+  
+  // Convert to BusinessCardData for NFC writing
+  BusinessCardData toBusinessCardData() {
+    return BusinessCardData(
+      name: name,
+      email: email,
+      custom: {
+        'ticketId': ticketId,
+        'isVIP': isVIP.toString(),
+        'eventName': 'Tech Conference 2024',
+      },
+      cardType: CardType.event,
+      isTemporary: true,
+    );
+  }
+  
+  // Create from BusinessCardData when reading NFC
+  static EventAttendee fromBusinessCardData(BusinessCardData data) {
+    return EventAttendee(
+      name: data.name,
+      email: data.email ?? '',
+      ticketId: data.custom['ticketId'] ?? '',
+      isVIP: data.custom['isVIP'] == 'true',
+    );
+  }
+}
+
+// Register attendee and write to their NFC badge
+Future<void> registerAttendee(EventAttendee attendee) async {
+  // Convert to business card format
+  final cardData = attendee.toBusinessCardData();
+  
+  // Write to NFC badge
+  await SwahiliNFC.writeTag(
+    data: cardData,
+    verifyAfterWrite: true,
+  );
+  
+  // Track attendance with analytics
+  SwahiliNFC.enableAnalytics(
+    analyticsConfig: AnalyticsConfig(
+      collectTimestamps: true,
+      collectDeviceInfo: false,
+    ),
+  );
+}
+
+// Check in attendee by scanning their badge
+Future<void> checkInAttendee() async {
+  try {
+    // Read NFC badge
+    final cardData = await SwahiliNFC.readTag();
+    
+    // Convert to attendee
+    final attendee = EventAttendee.fromBusinessCardData(cardData);
+    
+    // Register check-in
+    await recordAttendeeCheckIn(attendee);
+    
+    // Show confirmation
+    showMessage('Welcome, ${attendee.name}!');
+    if (attendee.isVIP) {
+      showMessage('VIP access granted!');
+    }
+  } catch (e) {
+    showError('Failed to check in: $e');
+  }
+}
+```
+
+## Error Handling
+
+SwahiliNFC provides detailed error codes and messages to help you troubleshoot issues:
+
+```dart
+try {
+  await SwahiliNFC.readTag();
+} catch (e) {
+  if (e is NFCError) {
+    // Access error details
+    print('Error code: ${e.code}');
+    print('Error message: ${e.message}');
+    print('User-friendly message: ${e.userMessage}');
+    
+    // Get troubleshooting tips
+    for (final tip in e.troubleshootingTips) {
+      print('Tip: $tip');
+    }
+  }
+}
+```
+
+## Documentation
+
+For full documentation, please see:
+- [API Reference](https://pub.dev/documentation/swahili_nfc/latest/)
+- [Example App](https://github.com/swahiliconnect/swahili_nfc/tree/main/example)
 
 ## Security Implementation Details
 

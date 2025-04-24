@@ -7,7 +7,7 @@ class NFCDeviceInfo {
   final String? name;
   final DateTime activatedAt;
   final bool isActive;
-  
+
   NFCDeviceInfo({
     required this.deviceId,
     required this.deviceType,
@@ -15,7 +15,7 @@ class NFCDeviceInfo {
     required this.activatedAt,
     this.isActive = true,
   });
-  
+
   /// Creates a NFCDeviceInfo from JSON
   factory NFCDeviceInfo.fromJson(Map<String, dynamic> json) {
     return NFCDeviceInfo(
@@ -29,7 +29,7 @@ class NFCDeviceInfo {
       isActive: json['isActive'] ?? true,
     );
   }
-  
+
   /// Converts NFCDeviceInfo to JSON
   Map<String, dynamic> toJson() {
     return {

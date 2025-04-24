@@ -20,25 +20,25 @@ abstract class PlatformNFC {
       );
     }
   }
-  
+
   /// Checks if NFC is available on the device
   Future<bool> isAvailable();
-  
+
   /// Starts an NFC session
   Future<dynamic> startSession({
     required bool isReading,
     required bool isWriting,
   });
-  
+
   /// Stops the current NFC session
   Future<void> stopSession();
-  
+
   /// Reads data from an NFC tag
   Future<dynamic> readTag();
-  
+
   /// Writes data to an NFC tag
   Future<void> writeTag(dynamic data);
-  
+
   /// Starts continuous reading for NFC tags
   void startContinuousReading({
     required Function(dynamic) onTagDetected,

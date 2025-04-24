@@ -1,9 +1,33 @@
 # Changelog
 
+## 0.1.3 - Example & Documentation Update (2024-04-25)
+
+### Added
+- Comprehensive example application demonstrating key features:
+  - NFC card reading and writing
+  - Card activation workflow
+  - Security level implementation
+  - UI for displaying scanned card details
+- Enhanced documentation with more usage examples
+- Better error handling in platform implementations
+
+### Fixed
+- Code formatting issues across multiple files
+- Fixed pubspec.yaml to comply with pub.dev standards
+
+## 0.1.2 - Bug Fixes (2024-04-24)
+
+### Fixed
+- Fixed Android NFC session handling
+- Improved error messages for better troubleshooting
+- Better handling of encrypted data
+
+### Changed
+- Optimized NDEF message handling for larger data payloads
+
 ## 0.1.0 - Initial Release (2024-04-22)
 
 ### Added
-
 - Core NFC functionality:
   - Reading NFC tags (one-time and background scanning)
   - Writing to NFC tags with verification

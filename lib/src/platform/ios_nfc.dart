@@ -7,10 +7,11 @@ import '../utils/error_handler.dart';
 
 /// iOS-specific NFC implementation
 class IOSNFC implements PlatformNFC {
-  static const MethodChannel _channel = MethodChannel('com.swahilicard.nfc/ios');
-  
+  static const MethodChannel _channel =
+      MethodChannel('com.swahilicard.nfc/ios');
+
   bool _isSessionActive = false;
-  
+
   @override
   Future<bool> isAvailable() async {
     try {
@@ -19,7 +20,7 @@ class IOSNFC implements PlatformNFC {
       return false;
     }
   }
-  
+
   @override
   Future<dynamic> startSession({
     required bool isReading,
@@ -28,16 +29,16 @@ class IOSNFC implements PlatformNFC {
     if (_isSessionActive) {
       await stopSession();
     }
-    
+
     try {
       final result = await _channel.invokeMethod('startSession', {
         'isReading': isReading,
         'isWriting': isWriting,
-        'alertMessage': isReading 
+        'alertMessage': isReading
             ? 'Hold your iPhone near an NFC business card'
             : 'Hold your iPhone near an NFC card to write data',
       });
-      
+
       _isSessionActive = true;
       return result;
     } catch (e) {
@@ -47,13 +48,13 @@ class IOSNFC implements PlatformNFC {
       );
     }
   }
-  
+
   @override
   Future<void> stopSession() async {
     if (!_isSessionActive) {
       return;
     }
-    
+
     try {
       await _channel.invokeMethod('stopSession');
       _isSessionActive = false;
@@ -64,7 +65,7 @@ class IOSNFC implements PlatformNFC {
       );
     }
   }
-  
+
   @override
   Future<dynamic> readTag() async {
     if (!_isSessionActive) {
@@ -73,7 +74,7 @@ class IOSNFC implements PlatformNFC {
         message: 'No active session for reading',
       );
     }
-    
+
     try {
       // iOS handles tag reading in the session automatically
       // This call just returns the data from the current session
@@ -85,7 +86,7 @@ class IOSNFC implements PlatformNFC {
       );
     }
   }
-  
+
   @override
   Future<void> writeTag(dynamic data) async {
     if (!_isSessionActive) {
@@ -94,7 +95,7 @@ class IOSNFC implements PlatformNFC {
         message: 'No active session for writing',
       );
     }
-    
+
     try {
       await _channel.invokeMethod('writeTag', {
         'data': data,
@@ -106,22 +107,23 @@ class IOSNFC implements PlatformNFC {
       );
     }
   }
-  
+
   @override
   void startContinuousReading({
     required Function(dynamic) onTagDetected,
   }) async {
     // iOS doesn't support true background scanning
     // Instead, we'll simulate it by starting a new session each time
-    
+
     try {
       // Set up event channel for tag detection
-      const EventChannel tagChannel = EventChannel('com.swahilicard.nfc/ios/tags');
-      
+      const EventChannel tagChannel =
+          EventChannel('com.swahilicard.nfc/ios/tags');
+
       tagChannel.receiveBroadcastStream().listen(
         (dynamic tagData) {
           onTagDetected(tagData);
-          
+
           // Restart session after a brief delay
           Future.delayed(const Duration(milliseconds: 500), () async {
             await stopSession();
@@ -133,7 +135,7 @@ class IOSNFC implements PlatformNFC {
           _logError('Error in continuous reading: $error');
         },
       );
-      
+
       // Start initial session
       await startSession(isReading: true, isWriting: false);
     } catch (e) {
@@ -143,7 +145,7 @@ class IOSNFC implements PlatformNFC {
       );
     }
   }
-  
+
   // Logger method instead of print
   void _logError(String message) {
     // In a production app, this would use a proper logging framework

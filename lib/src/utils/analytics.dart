@@ -11,17 +11,17 @@ import '../utils/error_handler.dart';
 class Analytics {
   // Analytics configuration
   AnalyticsConfig? _config;
-  
+
   // Local storage for scan records
   final List<ScanRecord> _scanRecords = [];
-  
+
   /// Enables analytics collection
   void enableAnalytics({
     required AnalyticsConfig analyticsConfig,
   }) {
     _config = analyticsConfig;
   }
-  
+
   /// Records a card scan
   Future<void> recordScan({
     required String cardId,
@@ -30,24 +30,25 @@ class Analytics {
     if (_config == null) {
       return; // Analytics not enabled
     }
-    
+
     try {
       // Create scan record
       final scanRecord = ScanRecord(
         cardId: cardId,
         timestamp: DateTime.now(),
-        deviceModel: _config!.collectDeviceInfo ? await _getDeviceModel() : null,
+        deviceModel:
+            _config!.collectDeviceInfo ? await _getDeviceModel() : null,
         deviceOs: _config!.collectDeviceInfo ? await _getDeviceOs() : null,
         location: _config!.collectLocationData ? await _getLocation() : null,
         metadata: metadata,
       );
-      
+
       // Store locally
       _scanRecords.add(scanRecord);
-      
+
       // Store in persistent storage
       await _saveScanRecord(scanRecord);
-      
+
       // Send to server (if implemented)
       _sendScanToServer(scanRecord);
     } catch (e) {
@@ -57,7 +58,7 @@ class Analytics {
       }
     }
   }
-  
+
   /// Gets scan history for a specific card
   Future<List<ScanRecord>> getCardScanHistory({
     required String cardId,
@@ -65,7 +66,7 @@ class Analytics {
     try {
       // Load from persistent storage
       final allRecords = await _loadScanRecords();
-      
+
       // Filter by card ID
       return allRecords.where((record) => record.cardId == cardId).toList();
     } catch (e) {
@@ -75,7 +76,7 @@ class Analytics {
       );
     }
   }
-  
+
   /// Gets device model (if allowed)
   Future<String?> _getDeviceModel() async {
     try {
@@ -91,7 +92,7 @@ class Analytics {
       return null;
     }
   }
-  
+
   /// Gets device OS (if allowed)
   Future<String?> _getDeviceOs() async {
     try {
@@ -105,14 +106,14 @@ class Analytics {
       return null;
     }
   }
-  
+
   /// Gets location (if allowed)
   Future<String?> _getLocation() async {
     // In a real implementation, this would use the location package
     // For this example, we'll return null
     return null;
   }
-  
+
   /// Saves scan record to persistent storage
   Future<void> _saveScanRecord(ScanRecord record) async {
     try {
@@ -124,7 +125,7 @@ class Analytics {
       }
     }
   }
-  
+
   /// Loads scan records from persistent storage
   Future<List<ScanRecord>> _loadScanRecords() async {
     try {
@@ -135,14 +136,15 @@ class Analytics {
       return [];
     }
   }
-  
+
   /// Sends scan record to server
   void _sendScanToServer(ScanRecord record) {
     try {
       // In a real implementation, this would send data to a server
       // For this example, we'll just print to console in debug mode
       if (kDebugMode) {
-        print('Would send scan record to server: ${json.encode(record.toJson())}');
+        print(
+            'Would send scan record to server: ${json.encode(record.toJson())}');
       }
     } catch (e) {
       if (kDebugMode) {

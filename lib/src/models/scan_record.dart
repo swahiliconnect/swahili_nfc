@@ -6,7 +6,7 @@ class ScanRecord {
   final String? deviceOs;
   final String? location;
   final Map<String, dynamic>? metadata;
-  
+
   ScanRecord({
     required this.cardId,
     required this.timestamp,
@@ -15,7 +15,7 @@ class ScanRecord {
     this.location,
     this.metadata,
   });
-  
+
   /// Creates a ScanRecord from JSON
   factory ScanRecord.fromJson(Map<String, dynamic> json) {
     return ScanRecord(
@@ -27,7 +27,7 @@ class ScanRecord {
       metadata: json['metadata'],
     );
   }
-  
+
   /// Converts ScanRecord to JSON
   Map<String, dynamic> toJson() {
     return {

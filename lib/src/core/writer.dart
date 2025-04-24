@@ -11,7 +11,7 @@ class NFCWriter {
   final NDEFHelper _ndefHelper = NDEFHelper();
   final Authentication _authentication = Authentication();
   final Encryption _encryption = Encryption();
-  
+
   /// Writes business card data to an NFC tag
   Future<bool> writeTag({
     required BusinessCardData data,
@@ -20,38 +20,39 @@ class NFCWriter {
     try {
       // Convert business card data to NDEF format
       final ndefData = _ndefHelper.convertToNDEF(data);
-      
+
       // Start tag writing session
       await _platformNFC.startSession(
         isReading: false,
         isWriting: true,
       );
-      
+
       // Write data to tag
       await _platformNFC.writeTag(ndefData);
-      
+
       // Verify data was written correctly if requested
       if (verifyAfterWrite) {
         await _platformNFC.stopSession();
-        
+
         // Start a new reading session
         await _platformNFC.startSession(
           isReading: true,
           isWriting: false,
         );
-        
+
         final readData = await _platformNFC.readTag();
         final readCard = _ndefHelper.convertFromNDEF(readData);
-        
+
         // Compare written data with read data
         if (readCard.cardId != data.cardId) {
           throw NFCError(
             code: NFCErrorCode.verificationError,
-            message: 'Verification failed: Tag data does not match written data',
+            message:
+                'Verification failed: Tag data does not match written data',
           );
         }
       }
-      
+
       return true;
     } catch (e) {
       if (e is NFCError) {
@@ -66,7 +67,7 @@ class NFCWriter {
       await _platformNFC.stopSession();
     }
   }
-  
+
   /// Starts the card activation process
   void startCardActivation({
     required BusinessCardData cardData,
@@ -81,15 +82,16 @@ class NFCWriter {
       if (onActivationStarted != null) {
         onActivationStarted();
       }
-      
+
       // Step 1: Apply security if needed (25%)
       if (security.level != SecurityLevel.open) {
         // Apply encryption based on security level
-        if (security.level == SecurityLevel.enhanced || 
+        if (security.level == SecurityLevel.enhanced ||
             security.level == SecurityLevel.premium) {
           // Generate encryption key if not provided
-          final encryptionKey = security.password ?? _encryption.generateRandomKey();
-          
+          final encryptionKey =
+              security.password ?? _encryption.generateRandomKey();
+
           await _authentication.setCardSecurity(
             securityLevel: security.level,
             credentials: SecurityCredentials(
@@ -99,12 +101,12 @@ class NFCWriter {
             ),
           );
         }
-        
+
         if (onProgress != null) {
           onProgress(0.25);
         }
       }
-      
+
       // Step 2: Prepare card data (50%)
       BusinessCardData preparedCardData = BusinessCardData(
         name: cardData.name,
@@ -119,44 +121,44 @@ class NFCWriter {
         securityLevel: security.level,
         isTemporary: cardData.isTemporary,
       );
-      
+
       if (onProgress != null) {
         onProgress(0.5);
       }
-      
+
       // Step 3: Write to card (75%)
       final success = await writeTag(
         data: preparedCardData,
         verifyAfterWrite: true,
       );
-      
+
       if (!success) {
         throw NFCError(
           code: NFCErrorCode.activationError,
           message: 'Failed to write data during activation',
         );
       }
-      
+
       if (onProgress != null) {
         onProgress(0.75);
       }
-      
+
       // Step 4: Complete activation (100%)
       if (onProgress != null) {
         onProgress(1.0);
       }
-      
+
       if (onActivationComplete != null) {
         onActivationComplete(preparedCardData.cardId);
       }
     } catch (e) {
-      final error = e is NFCError 
-          ? e 
+      final error = e is NFCError
+          ? e
           : NFCError(
               code: NFCErrorCode.activationError,
               message: 'Card activation failed: ${e.toString()}',
             );
-      
+
       if (onError != null) {
         onError(error);
       }

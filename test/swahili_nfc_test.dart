@@ -8,7 +8,7 @@ void main() {
       // Replace with actual tests when implementation is ready
       expect(true, isTrue);
     });
-    
+
     // TODO: Implement tests for the following components:
     // - Business card data model
     // - NDEF helper
