@@ -22,6 +22,9 @@ rootProject.allprojects {
 apply plugin: 'com.android.library'
 
 android {
+    // Add this namespace property
+    namespace 'com.swahilicard.nfc'
+    
     compileSdkVersion 33
 
     defaultConfig {

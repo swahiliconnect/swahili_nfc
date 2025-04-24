@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5 - Android Namespace Fix (2024-04-26)
+
+### Fixed
+- Added namespace property to Android build.gradle file
+- Fixed compatibility with Android Gradle Plugin 8.0+
+- Improved Android build configuration
+
 ## 0.1.4 - Android Gradle Fix (2024-04-26)
 
 ### Added
