@@ -26,8 +26,8 @@ import java.io.IOException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
-/** SwahiliNFCPluginKt - Kotlin implementation of the SwahiliNFC plugin */
-class SwahiliNFCPluginKt: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.NewIntentListener, EventChannel.StreamHandler {
+/** SwahiliNFCPlugin - Kotlin implementation of the SwahiliNFC plugin */
+class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.NewIntentListener, EventChannel.StreamHandler {
     /// The MethodChannel that will handle communication between Flutter and native Android
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
@@ -45,14 +45,14 @@ class SwahiliNFCPluginKt: FlutterPlugin, MethodCallHandler, ActivityAware, Plugi
     companion object {
         @JvmStatic
         fun registerWith(registrar: PluginRegistry.Registrar) {
-            val instance = SwahiliNFCPluginKt()
+            val instance = SwahiliNFCPlugin()
             instance.setupChannels(registrar.messenger(), registrar.activity())
             registrar.addOnNewIntentListener(instance)
         }
     }
 
     // Common setup for both registration methods
-    private fun setupChannels(messenger: BinaryMessenger, activity: Activity?) {
+    fun setupChannels(messenger: BinaryMessenger, activity: Activity?) {
         this.activity = activity
         nfcAdapter = activity?.let { NfcAdapter.getDefaultAdapter(it) }
 

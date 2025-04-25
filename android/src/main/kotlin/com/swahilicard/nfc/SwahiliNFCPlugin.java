@@ -13,52 +13,71 @@ import io.flutter.plugin.common.PluginRegistry.Registrar;
 
 /**
  * SwahiliNFCPlugin
- * This Java class is a bridge to the Kotlin implementation
- * It ensures the plugin can be properly registered by the Java compiler
+ * Main entry point for the plugin's Java API
  */
 public class SwahiliNFCPlugin implements FlutterPlugin, MethodCallHandler, ActivityAware {
-    // The Kotlin implementation that will do the actual work
-    private final SwahiliNFCPluginKt kotlinPlugin = new SwahiliNFCPluginKt();
+    private MethodChannel channel;
+    private SwahiliNFCPluginKt kotlinImplementation;
 
     /**
-     * Plugin registration for older embedding API (v1)
+     * Plugin registration for pre-Flutter embedding v2
      */
     public static void registerWith(Registrar registrar) {
-        SwahiliNFCPluginKt.registerWith(registrar);
+        final SwahiliNFCPlugin instance = new SwahiliNFCPlugin();
+        instance.initializePlugin(registrar.messenger(), registrar.activity());
+        registrar.addNewIntentListener(instance.kotlinImplementation);
+    }
+
+    private void initializePlugin(io.flutter.plugin.common.BinaryMessenger messenger, 
+                                android.app.Activity activity) {
+        kotlinImplementation = new SwahiliNFCPluginKt();
+        kotlinImplementation.setupChannels(messenger, activity);
+        
+        channel = new MethodChannel(messenger, "com.swahilicard.nfc/android");
+        channel.setMethodCallHandler(this);
     }
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
-        kotlinPlugin.onAttachedToEngine(flutterPluginBinding);
+        kotlinImplementation = new SwahiliNFCPluginKt();
+        kotlinImplementation.onAttachedToEngine(flutterPluginBinding);
+        
+        channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), 
+                                   "com.swahilicard.nfc/android");
+        channel.setMethodCallHandler(this);
     }
 
     @Override
     public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
-        kotlinPlugin.onMethodCall(call, result);
+        kotlinImplementation.onMethodCall(call, result);
     }
 
     @Override
     public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-        kotlinPlugin.onDetachedFromEngine(binding);
+        kotlinImplementation.onDetachedFromEngine(binding);
+        channel.setMethodCallHandler(null);
+        channel = null;
     }
 
     @Override
     public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
-        kotlinPlugin.onAttachedToActivity(binding);
+        kotlinImplementation.onAttachedToActivity(binding);
+        binding.addOnNewIntentListener(kotlinImplementation);
     }
 
     @Override
     public void onDetachedFromActivityForConfigChanges() {
-        kotlinPlugin.onDetachedFromActivityForConfigChanges();
+        kotlinImplementation.onDetachedFromActivityForConfigChanges();
     }
 
     @Override
     public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
-        kotlinPlugin.onReattachedToActivityForConfigChanges(binding);
+        kotlinImplementation.onReattachedToActivityForConfigChanges(binding);
+        binding.addOnNewIntentListener(kotlinImplementation);
     }
 
     @Override
     public void onDetachedFromActivity() {
-        kotlinPlugin.onDetachedFromActivity();
+        kotlinImplementation.onDetachedFromActivity();
     }
 }

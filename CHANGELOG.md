@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.10 - Android Plugin Structure Fix (2024-04-25)
+
+### Fixed
+- Fixed Android plugin class naming and directory structure
+- Added proper Java implementation in the correct location
+- Added correctly named Kotlin implementation class
+
 ## 0.1.9 - Android Plugin Package Fix (2024-04-25)
 
 ### Fixed
