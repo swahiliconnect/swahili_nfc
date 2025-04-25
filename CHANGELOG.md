@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.6 - Android Plugin Registration Fix (2024-04-28)
+
+### Fixed
+- Fixed Android plugin registration issue for compatibility with Flutter embedding v1
+- Added proper static registration method for the Kotlin plugin class
+- Improved nullability handling for Activity references
+- Enhanced parcelable handling for Android 13+ (Tiramisu)
+- Fixed potential memory leaks with activity references
+
+### Improved
+- Refactored channel setup code for better maintainability
+- Added proper deprecation annotations and suppressions
+- Better error handling during NFC operations
+
+
 ## 0.1.5 - Android Namespace Fix (2024-04-26)
 
 ### Fixed
