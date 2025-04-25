@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.9 - Android Plugin Package Fix (2024-04-25)
+
+### Fixed
+- Fixed package name typo in Android implementation (swaahilicard → swahilicard)
+- Moved Java implementation to correct directory structure
+- Fixed Java and Kotlin plugin registration
+
 ## 0.1.8 - Android Plugin File Structure Fix (2024-04-29)
 
 ### Fixed
