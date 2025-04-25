@@ -43,11 +43,11 @@ class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginR
 
     // Static method for compatibility with the original embedding
     companion object {
-        @JvmStatic
-        fun registerWith(registrar: PluginRegistry.Registrar) {
-            val instance = SwahiliNFCPlugin()
-            instance.setupChannels(registrar.messenger(), registrar.activity())
-            registrar.addOnNewIntentListener(instance)
+    @JvmStatic
+    fun registerWith(registrar: PluginRegistry.Registrar) {
+        val instance = SwahiliNFCPlugin()
+        instance.setupChannels(registrar.messenger(), registrar.activity())
+        registrar.addOnNewIntentListener(instance)
         }
     }
 
