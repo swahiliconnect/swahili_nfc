@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.14 - bug fixes (2024-04-25)
+
+### Fixed
+- SwahiliNFC plugin registration bug fixes
+
 ## 0.1.13 - Fix SwahiliNFC plugin registration (2024-04-25)
 
 ### Fixed
