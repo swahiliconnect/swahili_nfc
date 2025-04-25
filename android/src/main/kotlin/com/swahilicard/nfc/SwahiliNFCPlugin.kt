@@ -18,7 +18,6 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding
 import org.json.JSONObject
@@ -40,16 +39,6 @@ class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginR
     private var tagEventSink: EventChannel.EventSink? = null
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
-
-    // Static method for compatibility with the original embedding
-    companion object {
-        @JvmStatic
-        fun registerWith(registrar: io.flutter.plugin.common.PluginRegistry.Registrar) {
-            val instance = SwahiliNFCPlugin()
-            instance.setupChannels(registrar.messenger(), registrar.activity())
-            registrar.addOnNewIntentListener(instance)
-        }
-    }
 
     // Common setup for both registration methods
     fun setupChannels(messenger: BinaryMessenger, activity: Activity?) {
