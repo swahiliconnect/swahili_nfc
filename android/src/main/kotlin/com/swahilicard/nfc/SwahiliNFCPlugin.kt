@@ -9,25 +9,19 @@ import android.nfc.tech.NdefFormatable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import androidx.annotation.NonNull
 import io.flutter.embedding.engine.plugins.FlutterPlugin
-import io.flutter.embedding.engine.plugins.activity.ActivityAware
-import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.common.BinaryMessenger
-import io.flutter.embedding.engine.plugins.FlutterPlugin.FlutterPluginBinding
-import org.json.JSONObject
+import io.flutter.plugin.common.PluginRegistry
 import java.io.IOException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
-/** SwahiliNFCPlugin - Kotlin implementation of the SwahiliNFC plugin */
-class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.NewIntentListener, EventChannel.StreamHandler {
-    /// The MethodChannel that will handle communication between Flutter and native Android
+/** SwahiliNFCPluginKt - Kotlin implementation called by the Java wrapper */
+class SwahiliNFCPluginKt: PluginRegistry.NewIntentListener {
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
     private var activity: Activity? = null
@@ -40,23 +34,31 @@ class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginR
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // Common setup for both registration methods
+    // Setup channels for both registration methods
     fun setupChannels(messenger: BinaryMessenger, activity: Activity?) {
         this.activity = activity
         nfcAdapter = activity?.let { NfcAdapter.getDefaultAdapter(it) }
 
         channel = MethodChannel(messenger, "com.swahilicard.nfc/android")
-        channel.setMethodCallHandler(this)
+        channel.setMethodCallHandler { call, result -> onMethodCall(call, result) }
         
         eventChannel = EventChannel(messenger, "com.swahilicard.nfc/android/tags")
-        eventChannel.setStreamHandler(this)
+        eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                tagEventSink = events
+            }
+
+            override fun onCancel(arguments: Any?) {
+                tagEventSink = null
+            }
+        })
     }
 
-    override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPluginBinding) {
-        setupChannels(flutterPluginBinding.binaryMessenger, null)
+    fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
+        // This method is called by the Java wrapper
     }
 
-    override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+    fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             "isAvailable" -> {
                 result.success(nfcAdapter != null && nfcAdapter!!.isEnabled)
@@ -111,47 +113,72 @@ class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginR
                 )
             }
             "writeTag" -> {
-                val data = call.argument<String>("data")
-                if (data == null) {
-                    result.error(
-                        "invalid_args",
-                        "Data is required for writing",
-                        null
-                    )
-                    return
-                }
-                
-                writeData = data
-                pendingResult = result
+    val data = call.argument<Any>("data")
+    if (data == null) {
+        result.error(
+            "invalid_args",
+            "Data is required for writing",
+            null
+        )
+        return
+    }
+    
+    // Convert the data to a JSON string regardless of whether it's a Map or String
+    val jsonData = when (data) {
+        is Map<*, *> -> {
+            try {
+                // Convert map to JSON string
+                org.json.JSONObject(data).toString()
+            } catch (e: Exception) {
+                result.error(
+                    "conversion_error",
+                    "Failed to convert data to JSON: ${e.message}",
+                    null
+                )
+                return
             }
+        }
+        is String -> data // Already a string
+        else -> {
+            result.error(
+                "invalid_args",
+                "Data must be a Map or String",
+                null
+            )
+            return
+        }
+    }
+    
+    writeData = jsonData
+    pendingResult = result
+}
             else -> {
                 result.notImplemented()
             }
         }
     }
 
-    override fun onDetachedFromEngine(@NonNull binding: FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
-        eventChannel.setStreamHandler(null)
+    fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        // This method is called by the Java wrapper
     }
 
-    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+    fun onAttachedToActivity(binding: io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding) {
         activity = binding.activity
         binding.addOnNewIntentListener(this)
         nfcAdapter = NfcAdapter.getDefaultAdapter(activity)
     }
 
-    override fun onDetachedFromActivityForConfigChanges() {
+    fun onDetachedFromActivityForConfigChanges() {
         disableForegroundDispatch()
     }
 
-    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+    fun onReattachedToActivityForConfigChanges(binding: io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding) {
         activity = binding.activity
         binding.addOnNewIntentListener(this)
         nfcAdapter = NfcAdapter.getDefaultAdapter(activity)
     }
 
-    override fun onDetachedFromActivity() {
+    fun onDetachedFromActivity() {
         disableForegroundDispatch()
         activity = null
     }
@@ -393,14 +420,5 @@ class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginR
         )
         
         return android.nfc.NdefMessage(arrayOf(mimeRecord))
-    }
-
-    // EventChannel.StreamHandler implementation
-    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-        tagEventSink = events
-    }
-
-    override fun onCancel(arguments: Any?) {
-        tagEventSink = null
     }
 }
