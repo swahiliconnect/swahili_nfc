@@ -20,12 +20,12 @@ public class SwahiliNFCPlugin implements FlutterPlugin, MethodCallHandler, Activ
     private SwahiliNFCPluginKt kotlinImplementation;
 
     /**
-     * Plugin registration for pre-Flutter embedding v2
+     * Plugin registration for pre-Flutter embedding v1
      */
     public static void registerWith(Registrar registrar) {
         final SwahiliNFCPlugin instance = new SwahiliNFCPlugin();
         instance.initializePlugin(registrar.messenger(), registrar.activity());
-        registrar.addNewIntentListener(instance.kotlinImplementation);
+        registrar.addOnNewIntentListener(instance.kotlinImplementation);
     }
 
     private void initializePlugin(io.flutter.plugin.common.BinaryMessenger messenger, 
