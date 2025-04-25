@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.8 - Android Plugin File Structure Fix (2024-04-29)
+
+### Fixed
+- Fixed incorrect file paths for Android plugin implementation
+- Properly structured Java and Kotlin implementation files
+- Resolved "cannot find symbol: class SwahiliNFCPlugin" error
+
 ## 0.1.7 - Android Plugin Registration Fix (2024-04-28)
 
 ### Fixed
