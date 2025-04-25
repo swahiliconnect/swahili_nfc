@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 - Android Plugin Registration Fix (2024-04-28)
+
+### Fixed
+- Added Java implementation of the plugin for direct Java compiler compatibility
+- Renamed original Kotlin implementation to SwahiliNFCPluginKt
+- Updated Gradle configuration to properly handle both Java and Kotlin sources
+
 ## 0.1.6 - Android Plugin Registration Fix (2024-04-28)
 
 ### Fixed

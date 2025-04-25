@@ -26,8 +26,8 @@ import java.io.IOException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
-/** SwahiliNFCPlugin */
-class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.NewIntentListener, EventChannel.StreamHandler {
+/** SwahiliNFCPluginKt - Kotlin implementation of the SwahiliNFC plugin */
+class SwahiliNFCPluginKt: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.NewIntentListener, EventChannel.StreamHandler {
     /// The MethodChannel that will handle communication between Flutter and native Android
     private lateinit var channel: MethodChannel
     private lateinit var eventChannel: EventChannel
@@ -42,11 +42,13 @@ class SwahiliNFCPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginR
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // Static method for compatibility with the original embedding
-    @JvmStatic
-    fun registerWith(registrar: PluginRegistry.Registrar) {
-        val instance = SwahiliNFCPlugin()
-        instance.setupChannels(registrar.messenger(), registrar.activity())
-        registrar.addOnNewIntentListener(instance)
+    companion object {
+        @JvmStatic
+        fun registerWith(registrar: PluginRegistry.Registrar) {
+            val instance = SwahiliNFCPluginKt()
+            instance.setupChannels(registrar.messenger(), registrar.activity())
+            registrar.addOnNewIntentListener(instance)
+        }
     }
 
     // Common setup for both registration methods
