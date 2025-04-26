@@ -1,0 +1,19 @@
+<!-- Add these entries to your existing Info.plist file -->
+<key>NFCReaderUsageDescription</key>
+<string>This app needs NFC to read and write business cards</string>
+
+<key>com.apple.developer.nfc.readersession.formats</key>
+<array>
+    <string>NDEF</string>
+    <string>TAG</string>
+</array>
+
+<!-- For tag reading/writing that launches the app -->
+<key>application-identifier</key>
+<string>$(AppIdentifierPrefix)com.example.swahiliNfcDemo</string>
+
+<!-- Add this to support Universal Links for NFC business cards -->
+<key>com.apple.developer.associated-domains</key>
+<array>
+    <string>applinks:swahilicard.com</string>
+</array>

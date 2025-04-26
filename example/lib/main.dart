@@ -1,9 +1,9 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:swahili_nfc/swahili_nfc.dart';
 
 void main() {
+  // Enable NFC debugging
+  SwahiliNFC.enableDebugLogging(true);
   runApp(const MyApp());
 }
 
@@ -52,6 +52,7 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
   
   // Read data
   BusinessCardData? _lastScannedCard;
+  String _rawNfcData = "No data";
   
   // Write form controllers
   final _formKey = GlobalKey<FormState>();
@@ -60,20 +61,6 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
   final _positionController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-
-  // Social media fields
-  final List<Map<String, TextEditingController>> _socialFields = [
-    {'platform': TextEditingController(), 'value': TextEditingController()}
-  ];
-  
-  // Custom fields
-  final List<Map<String, TextEditingController>> _customFields = [
-    {'key': TextEditingController(), 'value': TextEditingController()}
-  ];
-  
-  // Security level selection
-  SecurityLevel _securityLevel = SecurityLevel.open;
   
   @override
   void initState() {
@@ -91,18 +78,6 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
     _positionController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _passwordController.dispose();
-    
-    for (var field in _socialFields) {
-      field['platform']!.dispose();
-      field['value']!.dispose();
-    }
-    
-    for (var field in _customFields) {
-      field['key']!.dispose();
-      field['value']!.dispose();
-    }
-    
     super.dispose();
   }
 
@@ -137,14 +112,24 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
     setState(() {
       _isOperationInProgress = true;
       _statusMessage = 'Place NFC card near device...';
+      _rawNfcData = "Reading...";
     });
     
     try {
+      // Try to get raw data first for debugging
+      String rawData = "";
+      try {
+        rawData = await SwahiliNFC.dumpTagRawData();
+      } catch (e) {
+        rawData = "Error getting raw data: ${e.toString()}";
+      }
+      
       // Call the SwahiliNFC API to read a tag
       final cardData = await SwahiliNFC.readTag();
       
       setState(() {
         _lastScannedCard = cardData;
+        _rawNfcData = rawData;
         _statusMessage = 'Card read successfully!';
         _isOperationInProgress = false;
         
@@ -167,8 +152,8 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
     }
   }
 
-  // Write form data to an NFC tag
-  Future<void> _writeCustomTag() async {
+  // Write basic card data to an NFC tag
+  Future<void> _writeBasicCard() async {
     if (!_formKey.currentState!.validate() || _isOperationInProgress) {
       return;
     }
@@ -179,85 +164,20 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
     });
     
     try {
-      // Build social media map
-      final social = <String, String>{};
-      for (var field in _socialFields) {
-        final platform = field['platform']!.text.trim();
-        final value = field['value']!.text.trim();
-        if (platform.isNotEmpty && value.isNotEmpty) {
-          social[platform.toLowerCase()] = value;
-        }
-      }
-      
-      // Build custom fields map
-      final custom = <String, String>{};
-      for (var field in _customFields) {
-        final key = field['key']!.text.trim();
-        final value = field['value']!.text.trim();
-        if (key.isNotEmpty && value.isNotEmpty) {
-          custom[key.toLowerCase()] = value;
-        }
-      }
-      
-      // Create business card data
+      // Create business card data with minimal fields for reliability
       final cardData = BusinessCardData(
         name: _nameController.text.trim(),
         company: _companyController.text.trim().isNotEmpty ? _companyController.text.trim() : null,
         position: _positionController.text.trim().isNotEmpty ? _positionController.text.trim() : null,
         email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
         phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
-        social: social,
-        custom: custom,
-        securityLevel: _securityLevel,
       );
       
-      bool success;
-      
-      // Check if we need to handle security
-      if (_securityLevel != SecurityLevel.open && _passwordController.text.isNotEmpty) {
-        // For secure cards, use the card activation flow
-        final securityOptions = SecurityOptions(
-          level: _securityLevel,
-          password: _passwordController.text,
-          expiry: DateTime.now().add(const Duration(days: 365)),
-        );
-        
-        // Create a completer to handle the async result
-        final completer = Completer<bool>();
-        
-        // Start activation with security
-        SwahiliNFC.startCardActivation(
-          cardData: cardData,
-          security: securityOptions,
-          deviceType: NFCDeviceType.card,
-          onActivationStarted: () {
-            setState(() {
-              _statusMessage = 'Please hold your card near the device';
-            });
-          },
-          onProgress: (progress) {
-            setState(() {
-              _statusMessage = 'Writing in progress: ${(progress * 100).toInt()}%';
-            });
-          },
-          onActivationComplete: (cardId) {
-            completer.complete(true);
-          },
-          onError: (error) {
-            completer.completeError(error);
-          },
-        );
-        
-        // Wait for the result
-        success = await completer.future;
-        
-      } else {
-        // For open cards, use the direct write method
-        success = await SwahiliNFC.writeTag(
-          data: cardData,
-          verifyAfterWrite: true,
-        );
-      }
+      // Write to tag with verification
+      final success = await SwahiliNFC.writeTag(
+        data: cardData,
+        verifyAfterWrite: true,
+      );
       
       setState(() {
         _statusMessage = success 
@@ -285,48 +205,6 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
     }
   }
 
-  // Add a new social media field
-  void _addSocialField() {
-    setState(() {
-      _socialFields.add({
-        'platform': TextEditingController(),
-        'value': TextEditingController()
-      });
-    });
-  }
-
-  // Remove a social media field
-  void _removeSocialField(int index) {
-    if (_socialFields.length > 1) {
-      setState(() {
-        _socialFields[index]['platform']!.dispose();
-        _socialFields[index]['value']!.dispose();
-        _socialFields.removeAt(index);
-      });
-    }
-  }
-
-  // Add a new custom field
-  void _addCustomField() {
-    setState(() {
-      _customFields.add({
-        'key': TextEditingController(),
-        'value': TextEditingController()
-      });
-    });
-  }
-
-  // Remove a custom field
-  void _removeCustomField(int index) {
-    if (_customFields.length > 1) {
-      setState(() {
-        _customFields[index]['key']!.dispose();
-        _customFields[index]['value']!.dispose();
-        _customFields.removeAt(index);
-      });
-    }
-  }
-
   // Show a success SnackBar
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -334,7 +212,6 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
         content: Text(message),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -346,7 +223,6 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
         content: Text(message),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -536,231 +412,13 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
             ),
           ),
           
-          // Social media card
-          Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Social Media',
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle),
-                        onPressed: _addSocialField,
-                        tooltip: 'Add social media',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Dynamic social media fields
-                  ..._socialFields.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final field = entry.value;
-                    
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Platform field
-                          Expanded(
-                            flex: 2,
-                            child: TextFormField(
-                              controller: field['platform'],
-                              decoration: const InputDecoration(
-                                labelText: 'Platform',
-                                border: OutlineInputBorder(),
-                                hintText: 'LinkedIn',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          
-                          // Value field
-                          Expanded(
-                            flex: 3,
-                            child: TextFormField(
-                              controller: field['value'],
-                              decoration: const InputDecoration(
-                                labelText: 'Value',
-                                border: OutlineInputBorder(),
-                                hintText: 'username',
-                              ),
-                            ),
-                          ),
-                          
-                          // Remove button
-                          if (_socialFields.length > 1)
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle, color: Colors.red),
-                              onPressed: () => _removeSocialField(index),
-                              tooltip: 'Remove',
-                            ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ],
-              ),
-            ),
-          ),
-          
-          // Custom fields card
-          Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Custom Fields',
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle),
-                        onPressed: _addCustomField,
-                        tooltip: 'Add custom field',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Dynamic custom fields
-                  ..._customFields.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final field = entry.value;
-                    
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12.0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Key field
-                          Expanded(
-                            flex: 2,
-                            child: TextFormField(
-                              controller: field['key'],
-                              decoration: const InputDecoration(
-                                labelText: 'Field Name',
-                                border: OutlineInputBorder(),
-                                hintText: 'Website',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          
-                          // Value field
-                          Expanded(
-                            flex: 3,
-                            child: TextFormField(
-                              controller: field['value'],
-                              decoration: const InputDecoration(
-                                labelText: 'Value',
-                                border: OutlineInputBorder(),
-                                hintText: 'example.com',
-                              ),
-                            ),
-                          ),
-                          
-                          // Remove button
-                          if (_customFields.length > 1)
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle, color: Colors.red),
-                              onPressed: () => _removeCustomField(index),
-                              tooltip: 'Remove',
-                            ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ],
-              ),
-            ),
-          ),
-          
-          // Security settings card
-          Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Security Settings',
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Security level dropdown
-                  DropdownButtonFormField<SecurityLevel>(
-                    decoration: const InputDecoration(
-                      labelText: 'Security Level',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.security),
-                    ),
-                    value: _securityLevel,
-                    items: SecurityLevel.values.map((level) {
-                      String levelName = level.toString().split('.').last;
-                      levelName = levelName[0].toUpperCase() + levelName.substring(1);
-                      
-                      return DropdownMenuItem<SecurityLevel>(
-                        value: level,
-                        child: Text(levelName),
-                      );
-                    }).toList(),
-                    onChanged: (SecurityLevel? value) {
-                      if (value != null) {
-                        setState(() {
-                          _securityLevel = value;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Show password field for higher security levels
-                  if (_securityLevel != SecurityLevel.open)
-                    TextFormField(
-                      controller: _passwordController,
-                      decoration: const InputDecoration(
-                        labelText: 'Security Password',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.password),
-                      ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (_securityLevel != SecurityLevel.open && 
-                            (value == null || value.trim().isEmpty)) {
-                          return 'Password is required for secure cards';
-                        }
-                        return null;
-                      },
-                    ),
-                ],
-              ),
-            ),
-          ),
-          
           // Write button
           SizedBox(
             width: double.infinity,
             height: 56,
             child: ElevatedButton.icon(
               onPressed: _isNfcAvailable && !_isOperationInProgress 
-                  ? _writeCustomTag 
+                  ? _writeBasicCard 
                   : null,
               icon: const Icon(Icons.nfc),
               label: const Text('WRITE TO NFC CARD', style: TextStyle(fontSize: 16)),
@@ -796,6 +454,40 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Debug Raw NFC Data
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Raw NFC Data (Debug)',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    width: double.infinity,
+                    constraints: const BoxConstraints(maxHeight: 100),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        _rawNfcData,
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -991,42 +683,12 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium,
                     ),
-                  ],
-                ),
-              ),
-            ),
-            
-            // Info card
-            Card(
-              elevation: 1,
-              margin: const EdgeInsets.only(bottom: 16),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'About NFC',
-                      style: theme.textTheme.titleLarge,
-                    ),
                     const SizedBox(height: 16),
-                    _buildInfoRow(
-                      theme,
-                      'What is NFC?',
-                      'Near Field Communication is a short-range wireless technology that enables communication between devices.',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildInfoRow(
-                      theme,
-                      'How to Use',
-                      'Hold your NFC-enabled device close to an NFC tag or card. The optimal distance is around 4cm (1.5 inches).',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildInfoRow(
-                      theme,
-                      'Security Levels',
-                      'This app supports multiple security levels for NFC cards, from open access to premium security with encryption.',
-                    ),
+                    TextButton.icon(
+                      onPressed: _checkNfcAvailability,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Refresh NFC Status'),
+                    )
                   ],
                 ),
               ),
@@ -1061,33 +723,13 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                     _buildTroubleshootingTip(
                       theme,
                       'Write Failed',
-                      'Make sure your NFC tag is writable and not locked. Some tags come pre-locked and cannot be written to.',
+                      'Make sure your NFC tag is writable and not locked. Try writing with minimal data first (just name and email).',
                     ),
-                  ],
-                ),
-              ),
-            ),
-            
-            // App info
-            Card(
-              elevation: 1,
-              color: theme.colorScheme.primaryContainer.withOpacity(0.5),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    Text(
-                      'SwahiliNFC Demo App',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Pull down to refresh NFC status',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer.withOpacity(0.7),
-                      ),
+                    const SizedBox(height: 12),
+                    _buildTroubleshootingTip(
+                      theme,
+                      'Testing with Simple Data',
+                      'When testing NFC, start with just basic fields. This app has been configured to use a simplified approach for better compatibility.',
                     ),
                   ],
                 ),
@@ -1151,24 +793,6 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
           ),
         ],
       ),
-    );
-  }
-  
-  // Helper to build info rows
-  Widget _buildInfoRow(ThemeData theme, String title, String description) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(description),
-      ],
     );
   }
   
