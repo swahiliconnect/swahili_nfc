@@ -1,41 +1,137 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:swahili_nfc/swahili_nfc.dart';
+import 'dart:async';
+import 'package:url_launcher/url_launcher.dart' as url_launcher;
+import 'package:flutter/services.dart';
 
 void main() {
-  // Enable NFC debugging
+  // Enable NFC debugging for development
   SwahiliNFC.enableDebugLogging(true);
-  runApp(const MyApp());
+  runApp(const SwahiliNFCApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+class SwahiliNFCApp extends StatefulWidget {
+  const SwahiliNFCApp({Key? key}) : super(key: key);
+
+  @override
+  State<SwahiliNFCApp> createState() => _SwahiliNFCAppState();
+}
+
+class _SwahiliNFCAppState extends State<SwahiliNFCApp> {
+  // Theme mode state
+  ThemeMode _themeMode = ThemeMode.system;
+
+  // Toggle theme between light and dark
+  void _toggleTheme() {
+    setState(() {
+      if (_themeMode == ThemeMode.light) {
+        _themeMode = ThemeMode.dark;
+      } else {
+        _themeMode = ThemeMode.light;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SwahiliNFC Demo',
+      title: 'SwahiliNFC',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.teal,
+          seedColor: const Color(0xFF079F71),
           brightness: Brightness.light,
         ),
         useMaterial3: true,
+        // Light mode specific settings
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        cardTheme: CardTheme(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey.shade100,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF079F71), width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.teal,
+          seedColor: const Color(0xFF079F71),
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
+        // Dark mode specific settings
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        cardTheme: CardTheme(
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey.shade800,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF07C78A), width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+        ),
       ),
-      themeMode: ThemeMode.system,
-      home: const NFCHomePage(),
+      themeMode: _themeMode,
+      home: NFCHomePage(toggleTheme: _toggleTheme, themeMode: _themeMode),
     );
   }
 }
 
 class NFCHomePage extends StatefulWidget {
-  const NFCHomePage({Key? key}) : super(key: key);
+  final Function toggleTheme;
+  final ThemeMode themeMode;
+
+  const NFCHomePage({
+    Key? key,
+    required this.toggleTheme,
+    required this.themeMode,
+  }) : super(key: key);
 
   @override
   State<NFCHomePage> createState() => _NFCHomePageState();
@@ -54,30 +150,51 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
   BusinessCardData? _lastScannedCard;
   String _rawNfcData = "No data";
   
-  // Write form controllers
-  final _formKey = GlobalKey<FormState>();
+  // Write selection
+  String _selectedWriteOption = 'contact'; // 'contact' or 'link'
+  
+  // Contact form controllers
+  final _contactFormKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _companyController = TextEditingController();
   final _positionController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+
+  // Link form controllers
+  final _linkFormKey = GlobalKey<FormState>();
+  final _linkTitleController = TextEditingController();
+  final _linkUrlController = TextEditingController();
   
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_handleTabChange);
+    
     // Check NFC availability when the app starts
     _checkNfcAvailability();
   }
   
+  void _handleTabChange() {
+    // Close keyboard when switching tabs
+    FocusScope.of(context).unfocus();
+  }
+  
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
+    
+    // Dispose of all controllers
     _nameController.dispose();
     _companyController.dispose();
     _positionController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _linkTitleController.dispose();
+    _linkUrlController.dispose();
+    
     super.dispose();
   }
 
@@ -104,6 +221,25 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
       _showErrorSnackBar('Failed to check NFC availability');
     }
   }
+  
+  // Open NFC operation bottom sheet
+  void _showNfcOperationSheet({required bool isRead}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => NFCOperationSheet(
+        isRead: isRead,
+        statusMessage: _statusMessage,
+        onCancel: () {
+          Navigator.pop(context);
+          setState(() {
+            _isOperationInProgress = false;
+          });
+        },
+      ),
+    );
+  }
 
   // Read data from an NFC tag
   Future<void> _readTag() async {
@@ -114,6 +250,9 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
       _statusMessage = 'Place NFC card near device...';
       _rawNfcData = "Reading...";
     });
+    
+    // Show the NFC operation sheet
+    _showNfcOperationSheet(isRead: true);
     
     try {
       // Try to get raw data first for debugging
@@ -127,6 +266,11 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
       // Call the SwahiliNFC API to read a tag
       final cardData = await SwahiliNFC.readTag();
       
+      // Pop the bottom sheet
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
       setState(() {
         _lastScannedCard = cardData;
         _rawNfcData = rawData;
@@ -137,8 +281,13 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
         _tabController.animateTo(1);
       });
       
-      _showSuccessSnackBar('Card read successfully');
+      _showSuccessDialog('Success', 'Card read successfully');
     } catch (e) {
+      // Pop the bottom sheet
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
       setState(() {
         _statusMessage = 'Error reading card: ${e.toString()}';
         _isOperationInProgress = false;
@@ -152,9 +301,9 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
     }
   }
 
-  // Write basic card data to an NFC tag
-  Future<void> _writeBasicCard() async {
-    if (!_formKey.currentState!.validate() || _isOperationInProgress) {
+  // Write link to an NFC tag
+  Future<void> _writeLink() async {
+    if (!_linkFormKey.currentState!.validate() || _isOperationInProgress) {
       return;
     }
     
@@ -163,14 +312,17 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
       _statusMessage = 'Place writable NFC card near device...';
     });
     
+    // Show the NFC operation sheet
+    _showNfcOperationSheet(isRead: false);
+    
     try {
-      // Create business card data with minimal fields for reliability
+      // Create business card data with link information
       final cardData = BusinessCardData(
-        name: _nameController.text.trim(),
-        company: _companyController.text.trim().isNotEmpty ? _companyController.text.trim() : null,
-        position: _positionController.text.trim().isNotEmpty ? _positionController.text.trim() : null,
-        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-        phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        name: _linkTitleController.text.trim(),
+        custom: {
+          'type': 'link',
+          'url': _linkUrlController.text.trim(),
+        },
       );
       
       // Write to tag with verification
@@ -179,21 +331,35 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
         verifyAfterWrite: true,
       );
       
+      // Pop the bottom sheet
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
       setState(() {
         _statusMessage = success 
-            ? 'Card written successfully!' 
+            ? 'Link written successfully!' 
             : 'Failed to write to card.';
         _isOperationInProgress = false;
       });
       
       if (success) {
-        _showSuccessSnackBar('Card written successfully');
+        _showSuccessDialog('Success', 'Link written successfully to card');
+        
+        // Clear form on success
+        _linkTitleController.clear();
+        _linkUrlController.clear();
       } else {
         _showErrorSnackBar('Failed to write to card');
       }
     } catch (e) {
+      // Pop the bottom sheet
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
       setState(() {
-        _statusMessage = 'Error writing card: ${e.toString()}';
+        _statusMessage = 'Error writing link: ${e.toString()}';
         _isOperationInProgress = false;
       });
       
@@ -203,6 +369,149 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
         _showErrorSnackBar('Failed to write to NFC card: ${e.toString()}');
       }
     }
+  }
+
+  // Write contact information to an NFC tag
+  Future<void> _writeContact() async {
+    if (!_contactFormKey.currentState!.validate() || _isOperationInProgress) {
+      return;
+    }
+    
+    setState(() {
+      _isOperationInProgress = true;
+      _statusMessage = 'Place writable NFC card near device...';
+    });
+    
+    // Show the NFC operation sheet
+    _showNfcOperationSheet(isRead: false);
+    
+    try {
+      // Create business card data with contact information
+      final cardData = BusinessCardData(
+        name: _nameController.text.trim(),
+        company: _companyController.text.trim().isNotEmpty ? _companyController.text.trim() : null,
+        position: _positionController.text.trim().isNotEmpty ? _positionController.text.trim() : null,
+        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
+        phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+        custom: {
+          'type': 'contact'
+        },
+      );
+      
+      // Write to tag with verification
+      final success = await SwahiliNFC.writeTag(
+        data: cardData,
+        verifyAfterWrite: true,
+      );
+      
+      // Pop the bottom sheet
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      setState(() {
+        _statusMessage = success 
+            ? 'Contact written successfully!' 
+            : 'Failed to write to card.';
+        _isOperationInProgress = false;
+      });
+      
+      if (success) {
+        _showSuccessDialog('Success', 'Contact information written successfully to card');
+        
+        // Clear form on success
+        _nameController.clear();
+        _companyController.clear();
+        _positionController.clear();
+        _emailController.clear();
+        _phoneController.clear();
+      } else {
+        _showErrorSnackBar('Failed to write to card');
+      }
+    } catch (e) {
+      // Pop the bottom sheet
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      setState(() {
+        _statusMessage = 'Error writing contact: ${e.toString()}';
+        _isOperationInProgress = false;
+      });
+      
+      if (e is NFCError) {
+        _showErrorDialog('NFC Write Error', e);
+      } else {
+        _showErrorSnackBar('Failed to write to NFC card: ${e.toString()}');
+      }
+    }
+  }
+  
+  // Share contact as VCF or text
+  void _shareContact(BusinessCardData contact) {
+    // In a complete implementation, this would create and share a VCF file
+    // For this example, we'll just show a dialog with the contact info
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Share Contact'),
+        content: const Text('In a full implementation, this would share the contact as a VCF file or via other sharing methods.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Open URL from link card
+  Future<void> _openUrl(String url) async {
+    if (url.isEmpty) {
+      _showErrorSnackBar('No URL available');
+      return;
+    }
+    
+    // Add http:// prefix if missing
+    String formattedUrl = url;
+    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+      formattedUrl = 'https://$formattedUrl';
+    }
+    
+    try {
+      final uri = Uri.parse(formattedUrl);
+      if (await url_launcher.canLaunchUrl(uri)) {
+        await url_launcher.launchUrl(uri);
+      } else {
+        _showErrorSnackBar('Could not open URL: $formattedUrl');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Invalid URL: $formattedUrl');
+    }
+  }
+
+  // Show a success dialog
+  void _showSuccessDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(title),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   // Show a success SnackBar
@@ -232,7 +541,13 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+            const SizedBox(width: 8),
+            Text(title),
+          ],
+        ),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,13 +584,39 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SwahiliNFC Demo'),
-        backgroundColor: theme.colorScheme.primaryContainer,
+        title: Row(
+          children: [
+            Image.asset('assets/swahilicard_logo.png', height: 24),
+            const SizedBox(width: 8),
+            const Text('SwahiliNFC'),
+          ],
+        ),
+        centerTitle: false,
+        backgroundColor: colorScheme.surface,
+        elevation: 0,
+        actions: [
+          // Theme toggle button
+          IconButton(
+            icon: Icon(
+              widget.themeMode == ThemeMode.dark 
+                ? Icons.light_mode 
+                : Icons.dark_mode,
+            ),
+            onPressed: () => widget.toggleTheme(),
+          ),
+          // Refresh NFC status button
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _checkNfcAvailability,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: colorScheme.primary,
           tabs: const [
             Tab(icon: Icon(Icons.edit), text: 'Write'),
             Tab(icon: Icon(Icons.contactless), text: 'Read'),
@@ -301,10 +642,109 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
   
   // Write Tab UI
   Widget _buildWriteTab(ThemeData theme) {
+    return ListView(
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        // Write type selector
+        Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'What would you like to write?',
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildOptionCard(
+                        theme: theme,
+                        title: 'Contact',
+                        icon: Icons.person,
+                        isSelected: _selectedWriteOption == 'contact',
+                        onTap: () => setState(() => _selectedWriteOption = 'contact'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildOptionCard(
+                        theme: theme,
+                        title: 'Link',
+                        icon: Icons.link,
+                        isSelected: _selectedWriteOption == 'link',
+                        onTap: () => setState(() => _selectedWriteOption = 'link'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        
+        // Conditional form based on selection
+        _selectedWriteOption == 'contact'
+            ? _buildContactForm(theme)
+            : _buildLinkForm(theme),
+      ],
+    );
+  }
+  
+  // Build option card for write type selection
+  Widget _buildOptionCard({
+    required ThemeData theme,
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final colorScheme = theme.colorScheme;
+    
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? colorScheme.primaryContainer : colorScheme.surfaceVariant.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? colorScheme.primary : colorScheme.outline.withOpacity(0.2),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 36,
+              color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // Contact Form UI
+  Widget _buildContactForm(ThemeData theme) {
     return Form(
-      key: _formKey,
-      child: ListView(
-        padding: const EdgeInsets.all(16.0),
+      key: _contactFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Basic information card
           Card(
@@ -314,9 +754,15 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Basic Information',
-                    style: theme.textTheme.titleLarge,
+                  Row(
+                    children: [
+                      Icon(Icons.person, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Personal Information',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   
@@ -325,9 +771,9 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                     controller: _nameController,
                     decoration: const InputDecoration(
                       labelText: 'Name *',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person),
+                      prefixIcon: Icon(Icons.person_outline),
                     ),
+                    textInputAction: TextInputAction.next,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Name is required';
@@ -335,27 +781,27 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                       return null;
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   
                   // Company Field
                   TextFormField(
                     controller: _companyController,
                     decoration: const InputDecoration(
                       labelText: 'Company',
-                      border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.business),
                     ),
+                    textInputAction: TextInputAction.next,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   
                   // Position Field
                   TextFormField(
                     controller: _positionController,
                     decoration: const InputDecoration(
                       labelText: 'Position',
-                      border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.work),
                     ),
+                    textInputAction: TextInputAction.next,
                   ),
                 ],
               ),
@@ -370,9 +816,15 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Contact Information',
-                    style: theme.textTheme.titleLarge,
+                  Row(
+                    children: [
+                      Icon(Icons.contact_phone, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Contact Information',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   
@@ -381,10 +833,10 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                     controller: _emailController,
                     decoration: const InputDecoration(
                       labelText: 'Email',
-                      border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.email),
                     ),
                     keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
                     validator: (value) {
                       if (value != null && value.trim().isNotEmpty) {
                         // Simple email validation
@@ -395,17 +847,17 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                       return null;
                     },
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
                   
                   // Phone Field
                   TextFormField(
                     controller: _phoneController,
                     decoration: const InputDecoration(
                       labelText: 'Phone',
-                      border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.phone),
                     ),
                     keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.done,
                   ),
                 ],
               ),
@@ -418,10 +870,100 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
             height: 56,
             child: ElevatedButton.icon(
               onPressed: _isNfcAvailable && !_isOperationInProgress 
-                  ? _writeBasicCard 
+                  ? _writeContact 
                   : null,
-              icon: const Icon(Icons.nfc),
-              label: const Text('WRITE TO NFC CARD', style: TextStyle(fontSize: 16)),
+              icon: const Icon(Icons.contactless),
+              label: const Text('WRITE CONTACT TO NFC CARD', style: TextStyle(fontSize: 16)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+  
+  // Link Form UI
+  Widget _buildLinkForm(ThemeData theme) {
+    return Form(
+      key: _linkFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Link information card
+          Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.link, color: theme.colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Link Information',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Link Title Field (Required)
+                  TextFormField(
+                    controller: _linkTitleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Link Title *',
+                      prefixIcon: Icon(Icons.title),
+                      hintText: 'e.g., My Website, GitHub Profile',
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Title is required';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // URL Field (Required)
+                  TextFormField(
+                    controller: _linkUrlController,
+                    decoration: const InputDecoration(
+                      labelText: 'URL *',
+                      prefixIcon: Icon(Icons.language),
+                      hintText: 'e.g., https://example.com',
+                    ),
+                    keyboardType: TextInputType.url,
+                    textInputAction: TextInputAction.done,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'URL is required';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Write button
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: _isNfcAvailable && !_isOperationInProgress 
+                  ? _writeLink
+                  : null,
+              icon: const Icon(Icons.contactless),
+              label: const Text('WRITE LINK TO NFC CARD', style: TextStyle(fontSize: 16)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
@@ -449,7 +991,7 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
               onPressed: _isNfcAvailable && !_isOperationInProgress 
                   ? _readTag 
                   : null,
-              icon: const Icon(Icons.nfc),
+              icon: const Icon(Icons.contactless),
               label: const Text('READ NFC CARD', style: TextStyle(fontSize: 16)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
@@ -458,158 +1000,372 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
             ),
           ),
           
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           
-          // Debug Raw NFC Data
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Raw NFC Data (Debug)',
-                    style: theme.textTheme.titleMedium,
+          // Last scanned card display
+          if (_lastScannedCard != null)
+            _buildScannedCardDisplay(theme)
+          else
+            _buildEmptyScannedCardPlaceholder(theme),
+        ],
+      ),
+    );
+  }
+  
+  // Scanned Card Display
+  Widget _buildScannedCardDisplay(ThemeData theme) {
+    final card = _lastScannedCard!;
+    final isLink = card.custom.containsKey('type') && card.custom['type'] == 'link';
+    
+    return Card(
+      elevation: 3,
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isLink ? Icons.link : Icons.person,
+                  color: theme.colorScheme.primary,
+                  size: 28,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isLink ? 'Link Card' : 'Contact Card',
+                  style: theme.textTheme.titleLarge,
+                ),
+                const Spacer(),
+                if (isLink)
+                  IconButton(
+                    onPressed: () => _openUrl(card.custom['url'] ?? ''),
+                    icon: const Icon(Icons.open_in_new),
+                    tooltip: 'Open URL',
+                  )
+                else
+                  IconButton(
+                    onPressed: () => _shareContact(card),
+                    icon: const Icon(Icons.share),
+                    tooltip: 'Share Contact',
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(4),
+              ],
+            ),
+            const Divider(),
+            
+            if (isLink) ...[
+              // Link card display
+              _buildInfoRow(theme, 'Title', card.name),
+              if (card.custom.containsKey('url'))
+                _buildInfoRow(theme, 'URL', card.custom['url']!),
+              
+              // Action button for link
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _openUrl(card.custom['url'] ?? ''),
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('OPEN LINK'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Contact card display
+              _buildInfoRow(theme, 'Name', card.name),
+              if (card.company != null)
+                _buildInfoRow(theme, 'Company', card.company!),
+              if (card.position != null)
+                _buildInfoRow(theme, 'Position', card.position!),
+              
+              const SizedBox(height: 8),
+              const Divider(),
+              const SizedBox(height: 8),
+              
+              if (card.email != null)
+                _buildContactRow(
+                  theme,
+                  'Email',
+                  card.email!,
+                  Icons.email,
+                  () => _launchEmail(card.email!),
+                ),
+              if (card.phone != null)
+                _buildContactRow(
+                  theme,
+                  'Phone',
+                  card.phone!,
+                  Icons.phone,
+                  () => _launchPhone(card.phone!),
+                ),
+              
+              // Social media links if available
+              if (card.social.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Divider(),
+                const SizedBox(height: 8),
+                
+                Text(
+                  'Social Profiles',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                ...card.social.entries.map((entry) => 
+                  _buildSocialRow(
+                    theme, 
+                    entry.key, 
+                    entry.value,
+                    () => _openUrl(entry.value),
+                  )
+                ),
+              ],
+              
+              // Action buttons for contact
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: card.phone != null ? () => _launchPhone(card.phone!) : null,
+                      icon: const Icon(Icons.phone),
+                      label: const Text('CALL'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.secondary,
+                        foregroundColor: theme.colorScheme.onSecondary,
+                      ),
                     ),
-                    width: double.infinity,
-                    constraints: const BoxConstraints(maxHeight: 100),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        _rawNfcData,
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: card.email != null ? () => _launchEmail(card.email!) : null,
+                      icon: const Icon(Icons.email),
+                      label: const Text('EMAIL'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: theme.colorScheme.onPrimary,
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Last scanned card display
-          if (_lastScannedCard != null)
-            Card(
-              elevation: 3,
-              margin: const EdgeInsets.only(bottom: 16),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _shareContact(card),
+                  icon: const Icon(Icons.save_alt),
+                  label: const Text('SAVE CONTACT'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.tertiary,
+                    foregroundColor: theme.colorScheme.onTertiary,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // Launch email app
+  Future<void> _launchEmail(String email) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: email,
+    );
+    
+    try {
+      if (await url_launcher.canLaunchUrl(uri)) {
+        await url_launcher.launchUrl(uri);
+      } else {
+        _showErrorSnackBar('Could not launch email app');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error launching email app: ${e.toString()}');
+    }
+  }
+  
+  // Launch phone app
+  Future<void> _launchPhone(String phone) async {
+    final uri = Uri(
+      scheme: 'tel',
+      path: phone.replaceAll(RegExp(r'[^\d+]'), ''),
+    );
+    
+    try {
+      if (await url_launcher.canLaunchUrl(uri)) {
+        await url_launcher.launchUrl(uri);
+      } else {
+        _showErrorSnackBar('Could not launch phone app');
+      }
+    } catch (e) {
+      _showErrorSnackBar('Error launching phone app: ${e.toString()}');
+    }
+  }
+  
+  // Build contact row with action
+  Widget _buildContactRow(
+    ThemeData theme,
+    String label,
+    String value,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.contactless, size: 24),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Scanned Card',
-                          style: theme.textTheme.titleLarge,
-                        ),
-                      ],
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 8),
-                    
-                    // Personal Information Section
-                    _buildSectionTitle('Personal Information', Icons.person, theme),
-                    _buildCardInfoRow(Icons.person, 'Name', _lastScannedCard!.name),
-                    if (_lastScannedCard!.company != null)
-                      _buildCardInfoRow(Icons.business, 'Company', _lastScannedCard!.company!),
-                    if (_lastScannedCard!.position != null)
-                      _buildCardInfoRow(Icons.work, 'Position', _lastScannedCard!.position!),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Contact Information Section
-                    _buildSectionTitle('Contact Information', Icons.contact_mail, theme),
-                    if (_lastScannedCard!.email != null)
-                      _buildCardInfoRow(Icons.email, 'Email', _lastScannedCard!.email!),
-                    if (_lastScannedCard!.phone != null)
-                      _buildCardInfoRow(Icons.phone, 'Phone', _lastScannedCard!.phone!),
-                    
-                    // Social Media Section
-                    if (_lastScannedCard!.social.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _buildSectionTitle('Social Media', Icons.share, theme),
-                      ..._lastScannedCard!.social.entries.map((entry) => 
-                        _buildCardInfoRow(
-                          _getSocialIcon(entry.key), 
-                          entry.key.substring(0, 1).toUpperCase() + entry.key.substring(1),
-                          entry.value,
-                        ),
+                    Text(
+                      label,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
-                    ],
-                    
-                    // Custom Fields Section
-                    if (_lastScannedCard!.custom.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      _buildSectionTitle('Additional Information', Icons.more_horiz, theme),
-                      ..._lastScannedCard!.custom.entries.map((entry) => 
-                        _buildCardInfoRow(
-                          Icons.label_outline,
-                          entry.key.substring(0, 1).toUpperCase() + entry.key.substring(1),
-                          entry.value,
-                        ),
-                      ),
-                    ],
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Card Metadata Section
-                    _buildSectionTitle('Card Details', Icons.info_outline, theme),
-                    _buildCardInfoRow(Icons.vpn_key, 'Card ID', _lastScannedCard!.cardId),
-                    _buildCardInfoRow(
-                      Icons.security,
-                      'Security Level',
-                      _lastScannedCard!.securityLevel.toString().split('.').last.substring(0, 1).toUpperCase() +
-                      _lastScannedCard!.securityLevel.toString().split('.').last.substring(1),
                     ),
-                    _buildCardInfoRow(
-                      Icons.calendar_today,
-                      'Created',
-                      _formatDate(_lastScannedCard!.createdAt),
+                    Text(
+                      value,
+                      style: theme.textTheme.bodyLarge,
                     ),
                   ],
                 ),
               ),
-            )
-          else
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Build social media row
+  Widget _buildSocialRow(
+    ThemeData theme,
+    String platform,
+    String handle,
+    VoidCallback onTap,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              Icon(_getSocialIcon(platform), size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.contactless_outlined, 
-                      size: 64,
-                      color: theme.colorScheme.primary.withOpacity(0.5),
-                    ),
-                    const SizedBox(height: 16),
                     Text(
-                      'No card scanned yet',
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Press "READ NFC CARD" and place an NFC card near your device',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.7),
+                      _formatPlatformName(platform),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
+                    ),
+                    Text(
+                      handle,
+                      style: theme.textTheme.bodyLarge,
                     ),
                   ],
                 ),
+              ),
+              Icon(
+                Icons.open_in_new,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Format platform name for display
+  String _formatPlatformName(String platform) {
+    // Capitalize first letter of each word
+    return platform.split('_').map((word) => 
+      word.substring(0, 1).toUpperCase() + word.substring(1).toLowerCase()
+    ).join(' ');
+  }
+  
+  // Build information row
+  Widget _buildInfoRow(ThemeData theme, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: theme.textTheme.bodyLarge,
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Empty Scanned Card Placeholder
+  Widget _buildEmptyScannedCardPlaceholder(ThemeData theme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.contactless_outlined, 
+              size: 64,
+              color: theme.colorScheme.primary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No card scanned yet',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Press "READ NFC CARD" and place an NFC card near your device',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -618,6 +1374,7 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
   Widget _buildStatusTab(ThemeData theme) {
     return RefreshIndicator(
       onRefresh: _checkNfcAvailability,
+      color: theme.colorScheme.primary,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16.0),
@@ -633,9 +1390,9 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                 child: Column(
                   children: [
                     Icon(
-                      _isNfcAvailable ? Icons.nfc : Icons.nfc,
+                      Icons.nfc,
                       size: 64,
-                      color: _isNfcAvailable ? theme.colorScheme.primary : Colors.red,
+                      color: _isNfcAvailable ? theme.colorScheme.primary : theme.colorScheme.error,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -650,11 +1407,11 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                       ),
                       decoration: BoxDecoration(
                         color: _isNfcAvailable 
-                            ? Colors.green.withOpacity(0.1) 
-                            : Colors.red.withOpacity(0.1),
+                            ? theme.colorScheme.primary.withOpacity(0.1) 
+                            : theme.colorScheme.error.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: _isNfcAvailable ? Colors.green : Colors.red,
+                          color: _isNfcAvailable ? theme.colorScheme.primary : theme.colorScheme.error,
                           width: 1,
                         ),
                       ),
@@ -663,14 +1420,14 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                         children: [
                           Icon(
                             _isNfcAvailable ? Icons.check_circle : Icons.error,
-                            color: _isNfcAvailable ? Colors.green : Colors.red,
+                            color: _isNfcAvailable ? theme.colorScheme.primary : theme.colorScheme.error,
                             size: 20,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             _isNfcAvailable ? 'Available' : 'Not Available',
                             style: TextStyle(
-                              color: _isNfcAvailable ? Colors.green : Colors.red,
+                              color: _isNfcAvailable ? theme.colorScheme.primary : theme.colorScheme.error,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -684,10 +1441,14 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                       style: theme.textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 16),
-                    TextButton.icon(
+                    OutlinedButton.icon(
                       onPressed: _checkNfcAvailability,
                       icon: const Icon(Icons.refresh),
                       label: const Text('Refresh NFC Status'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: theme.colorScheme.primary,
+                        side: BorderSide(color: theme.colorScheme.primary),
+                      ),
                     )
                   ],
                 ),
@@ -703,9 +1464,15 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Troubleshooting',
-                      style: theme.textTheme.titleLarge,
+                    Row(
+                      children: [
+                        Icon(Icons.help_outline, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Troubleshooting',
+                          style: theme.textTheme.titleLarge,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     _buildTroubleshootingTip(
@@ -723,14 +1490,53 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                     _buildTroubleshootingTip(
                       theme,
                       'Write Failed',
-                      'Make sure your NFC tag is writable and not locked. Try writing with minimal data first (just name and email).',
+                      'Make sure your NFC tag is writable and not locked. Try writing with minimal data first (just title and URL for links).',
                     ),
                     const SizedBox(height: 12),
                     _buildTroubleshootingTip(
                       theme,
-                      'Testing with Simple Data',
-                      'When testing NFC, start with just basic fields. This app has been configured to use a simplified approach for better compatibility.',
+                      'App Features',
+                      'This app allows you to write contacts or links to NFC cards. When read back, appropriate actions can be taken (like calling, emailing, or opening links).',
                     ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // About SwahiliNFC card
+            Card(
+              margin: const EdgeInsets.only(bottom: 24),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'About SwahiliNFC',
+                          style: theme.textTheme.titleLarge,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'SwahiliNFC is a comprehensive Flutter package for NFC business card applications with a focus on secure contact exchange.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Key Features:',
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildFeatureItem(theme, 'Simplified Tag Operations'),
+                    _buildFeatureItem(theme, 'Advanced Security Model'),
+                    _buildFeatureItem(theme, 'Multi-Device Management'),
+                    _buildFeatureItem(theme, 'Analytics & Insights'),
+                    _buildFeatureItem(theme, 'Offline Capabilities'),
                   ],
                 ),
               ),
@@ -741,54 +1547,23 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
     );
   }
   
-  // Helper to build section titles
-  Widget _buildSectionTitle(String title, IconData icon, ThemeData theme) {
+  // Helper to build feature item
+  Widget _buildFeatureItem(ThemeData theme, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        children: [
-          Icon(
-            icon, 
-            size: 18, 
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.primary,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Helper to build card info rows
-  Widget _buildCardInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: Colors.grey[600]),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 13,
-              ),
-            ),
+          Icon(
+            Icons.check_circle,
+            size: 16,
+            color: theme.colorScheme.primary,
           ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
-              value,
-              style: const TextStyle(fontSize: 14),
+              text,
+              style: theme.textTheme.bodyMedium,
             ),
           ),
         ],
@@ -803,7 +1578,7 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
       children: [
         Icon(
           Icons.lightbulb_outline,
-          color: theme.colorScheme.primary,
+          color: theme.colorScheme.secondary,
           size: 18,
         ),
         const SizedBox(width: 8),
@@ -815,7 +1590,7 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
+                  color: theme.colorScheme.secondary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -831,6 +1606,7 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
   IconData _getSocialIcon(String platform) {
     switch (platform.toLowerCase()) {
       case 'twitter':
+      case 'x':
         return Icons.alternate_email;
       case 'linkedin':
         return Icons.business_center;
@@ -843,25 +1619,171 @@ class _NFCHomePageState extends State<NFCHomePage> with SingleTickerProviderStat
       case 'website':
       case 'web':
         return Icons.language;
+      case 'tiktok':
+        return Icons.music_video;
+      case 'youtube':
+        return Icons.play_circle_filled;
+      case 'snapchat':
+        return Icons.chat_bubble;
       default:
         return Icons.link;
     }
   }
-  
-  // Format date for display
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
+}
+
+// Bottom sheet for NFC operation
+class NFCOperationSheet extends StatelessWidget {
+  final bool isRead;
+  final String statusMessage;
+  final VoidCallback onCancel;
+
+  const NFCOperationSheet({
+    Key? key,
+    required this.isRead,
+    required this.statusMessage,
+    required this.onCancel,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     
-    if (difference.inDays < 1) {
-      return 'Today at ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } else if (difference.inDays < 2) {
-      return 'Yesterday at ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else {
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: onCancel,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                  strokeWidth: 3,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            isRead ? 'Reading NFC Card...' : 'Writing to NFC Card...',
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            statusMessage,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 24),
+          Container(
+            width: double.infinity,
+            height: 100,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: NFCWavePainter(
+                      color: theme.colorScheme.primary.withOpacity(0.6),
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.contactless,
+                  size: 48,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Hold your device near the NFC card',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Keep the card still until the operation completes',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: onCancel,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: const Text('CANCEL'),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+// Custom painter for NFC waves animation
+class NFCWavePainter extends CustomPainter {
+  final Color color;
+  
+  NFCWavePainter({required this.color});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final now = DateTime.now().millisecondsSinceEpoch / 1000;
+    final center = Offset(size.width / 2, size.height / 2);
+    
+    for (int i = 1; i <= 3; i++) {
+      final radius = 20.0 + (i * 10) + (sin((now * 2) + i) * 5);
+      final opacity = 0.8 - (i * 0.2);
+      
+      final paint = Paint()
+        ..color = color.withOpacity(opacity)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+      
+      canvas.drawCircle(center, radius, paint);
     }
   }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
